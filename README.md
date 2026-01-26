@@ -1,1 +1,0 @@
-# BRAINMRI_Anomaly
