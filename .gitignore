@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (VERY IMPORTANT)
+Dataset/
+*.npy
+*.nii
+*.nii.gz
+
+# Models
+*.pt
+*.pth
+
+# OS
+.DS_Store
+Thumbs.db
