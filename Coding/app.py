@@ -3,17 +3,18 @@ import cv2
 import numpy as np
 import torch
 import torch.nn as nn
+import base64
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 # =====================================================
 # CONFIG
 # =====================================================
-MODEL_PATH = "autoencoder_mri.pth"
-UPLOAD_DIR = "uploads"
-IMG_SIZE = 128
-ANOMALY_THRESHOLD = 0.0003   # <-- use YOUR validation threshold
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "autoencoder_mri2.pth")
 
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+IMG_SIZE = 128
+ANOMALY_THRESHOLD = 0.0003
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -57,20 +58,25 @@ model.eval()
 criterion = nn.MSELoss(reduction="mean")
 
 # =====================================================
-# PREPROCESS FUNCTION (MUST MATCH TRAINING)
+# PREPROCESS
 # =====================================================
-def preprocess_image(image_path):
-    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+def preprocess_image(image_file):
+    file_bytes = np.frombuffer(image_file.read(), np.uint8)
+    img = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)
+
+    if img is None:
+        raise ValueError("Invalid image")
+
     img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
     img = img.astype(np.float32) / 255.0
-
     img = torch.from_numpy(img).unsqueeze(0).unsqueeze(0)
+
     return img.to(device)
 
 # =====================================================
-# HEATMAP GENERATION
+# HEATMAP → BASE64
 # =====================================================
-def generate_heatmap(original, reconstructed, save_path):
+def generate_heatmap_base64(original, reconstructed):
     error = np.abs(original - reconstructed)
     error = (error - error.min()) / (error.max() - error.min() + 1e-8)
 
@@ -85,23 +91,25 @@ def generate_heatmap(original, reconstructed, save_path):
     )
 
     overlay = cv2.addWeighted(original_rgb, 0.6, heatmap, 0.4, 0)
-    cv2.imwrite(save_path, overlay)
+
+    _, buffer = cv2.imencode(".png", overlay)
+    return base64.b64encode(buffer).decode("utf-8")
 
 # =====================================================
-# FLASK API
+# FLASK APP
 # =====================================================
 app = Flask(__name__)
+CORS(app)
 
 @app.route("/predict", methods=["POST"])
 def predict():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 
-    file = request.files["file"]
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
-    file.save(file_path)
-
-    img = preprocess_image(file_path)
+    try:
+        img = preprocess_image(request.files["file"])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
     with torch.no_grad():
         recon = model(img)
@@ -112,22 +120,17 @@ def predict():
     response = {
         "anomaly": bool(is_anomaly),
         "reconstruction_error": loss,
-        "threshold": ANOMALY_THRESHOLD
+        "threshold": ANOMALY_THRESHOLD,
+        "heatmap_base64": None
     }
 
     if is_anomaly:
-        original = img.cpu().numpy()[0, 0]
-        reconstructed = recon.cpu().numpy()[0, 0]
-
-        heatmap_path = os.path.join(UPLOAD_DIR, "heatmap.png")
-        generate_heatmap(original, reconstructed, heatmap_path)
-
-        response["heatmap_path"] = heatmap_path
+        response["heatmap_base64"] = generate_heatmap_base64(
+            img.cpu().numpy()[0, 0],
+            recon.cpu().numpy()[0, 0]
+        )
 
     return jsonify(response)
 
-# =====================================================
-# RUN SERVER
-# =====================================================
 if __name__ == "__main__":
     app.run(debug=True)
