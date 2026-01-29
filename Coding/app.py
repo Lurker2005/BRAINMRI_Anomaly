@@ -12,14 +12,12 @@ from flask_cors import CORS
 # =====================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "autoencoder_mri2.pth")
-<<<<<<< HEAD
+
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 
 UPLOAD_DIR = "uploads"
 IMG_SIZE = 128
 ANOMALY_THRESHOLD = 0.0003   # <-- use YOUR validation threshold
-=======
->>>>>>> 5f8b5d6669e6f97841ae75771207db5981b9fa41
 
 IMG_SIZE = 128
 ANOMALY_THRESHOLD = 0.0003
