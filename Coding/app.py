@@ -8,7 +8,10 @@ from flask import Flask, request, jsonify
 # =====================================================
 # CONFIG
 # =====================================================
-MODEL_PATH = "autoencoder_mri.pth"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "autoencoder_mri2.pth")
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+
 UPLOAD_DIR = "uploads"
 IMG_SIZE = 128
 ANOMALY_THRESHOLD = 0.0003   # <-- use YOUR validation threshold
@@ -130,4 +133,4 @@ def predict():
 # RUN SERVER
 # =====================================================
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=False)
